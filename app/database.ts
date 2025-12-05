@@ -50,3 +50,15 @@ export async function deleteExpense(id: number): Promise<void> {
     [id]
   );
 }
+
+export async function getMonthlyTotal(): Promise<number> {
+  const year = new Date().getFullYear();
+  const month = new Date().getMonth() + 1; // 0 = Jan, so +1
+  const result = await db.getFirstAsync<{ total: number }>(
+    `SELECT SUM(amount) as total
+     FROM expenses
+     WHERE strftime('%Y', date) = ? AND strftime('%m', date) = ?;`,
+    [String(year), month.toString().padStart(2, "0")]
+  );
+  return result?.total ?? 0;
+}

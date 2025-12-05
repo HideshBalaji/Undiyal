@@ -12,27 +12,42 @@ import {
   Platform,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { initDatabase, getExpenses, addExpense, deleteExpense, Expense } from "../database";
+import {
+  initDatabase,
+  getExpenses,
+  addExpense,
+  deleteExpense,
+  getMonthlyTotal,
+  Expense,
+} from "../database";
 
 export default function HomeScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
+  const [monthlyTotal, setMonthlyTotal] = useState(0); // number, not string
 
-  useEffect(() => {
-    initDatabase();
-    loadExpenses();
-  }, []);
-
+  // ---- load expenses + monthly total ----
   const loadExpenses = async () => {
     try {
       const data = await getExpenses();
       setExpenses(data);
+
+      const mTotal = await getMonthlyTotal();
+      setMonthlyTotal(mTotal);
     } catch (error) {
       Alert.alert("Error", "Failed to load expenses");
     }
   };
+
+  useEffect(() => {
+    const setup = async () => {
+      await initDatabase();
+      await loadExpenses();
+    };
+    setup();
+  }, []);
 
   const handleAddExpense = async () => {
     if (!title.trim() || !amount.trim()) {
@@ -58,25 +73,21 @@ export default function HomeScreen() {
   };
 
   const handleDeleteExpense = (id: number, title: string) => {
-    Alert.alert(
-      "Delete expense",
-      `Delete "${title}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteExpense(id);
-              await loadExpenses();
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete expense");
-            }
-          },
+    Alert.alert("Delete expense", `Delete "${title}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteExpense(id);
+            await loadExpenses();
+          } catch (error) {
+            Alert.alert("Error", "Failed to delete expense");
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const total = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -108,9 +119,19 @@ export default function HomeScreen() {
       <View style={styles.inner}>
         <Text style={styles.header}>Undiyal</Text>
 
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Total Spent</Text>
-          <Text style={styles.summaryAmount}>₹ {total.toFixed(2)}</Text>
+        {/* Summary cards */}
+        <View style={{ flexDirection: "row", gap: 12, marginBottom: 16 }}>
+          <View style={[styles.summaryCard, { flex: 1 }]}>
+            <Text style={styles.summaryLabel}>Total Spent</Text>
+            <Text style={styles.summaryAmount}>₹ {total.toFixed(2)}</Text>
+          </View>
+
+          <View style={[styles.summaryCard, { flex: 1 }]}>
+            <Text style={styles.summaryLabel}>This Month</Text>
+            <Text style={[styles.summaryAmount, { color: "#3b82f6" }]}>
+              ₹ {monthlyTotal.toFixed(2)}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.inputCard}>
@@ -150,7 +171,9 @@ export default function HomeScreen() {
           renderItem={renderItem}
           contentContainerStyle={expenses.length === 0 && styles.emptyList}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No expenses yet. Add your first one!</Text>
+            <Text style={styles.emptyText}>
+              No expenses yet. Add your first one!
+            </Text>
           }
         />
       </View>
@@ -180,7 +203,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     alignItems: "center",
-    marginBottom: 16,
   },
   summaryLabel: {
     fontSize: 14,
